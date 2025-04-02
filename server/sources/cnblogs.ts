@@ -1,13 +1,40 @@
 import { load } from "cheerio"
 import type { NewsItem } from "@shared/types"
-import { myFetch } from "#/utils/fetch"
+
+// 根据环境可能需要导入fetch
+// 在浏览器环境，fetch是全局可用的
+// 在Node.js环境，可能需要从node-fetch或其他库导入
+// 这里假设fetch是全局可用的，如果不是，请适当导入
+
+// 使用直接获取HTML的方法，绕过可能的API重定向
+const directFetchHtml = async (url: string, options = {}) => {
+  try {
+    // 使用fetch API直接请求，避免可能的中间件处理
+    const response = await fetch(url, {
+      ...options,
+      redirect: 'follow', // 允许重定向
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    
+    return await response.text();
+  } catch (error) {
+    console.error(`Error directly fetching ${url}:`, error);
+    throw error;
+  }
+}
 
 const cnblogs = defineSource(async () => {
   try {
     // 使用主页地址
     const url = "https://www.cnblogs.com/sitehome/p/1"
     console.log(`Fetching ${url}...`)
-    const res = await myFetch(url, {
+
+    // 尝试直接获取HTML，绕过可能的中间件处理
+    console.log('Trying direct fetch to avoid API redirection...')
+    const html = await directFetchHtml(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -15,22 +42,48 @@ const cnblogs = defineSource(async () => {
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache',
         'Referer': 'https://www.cnblogs.com/',
-        'DNT': '1',
-        'Upgrade-Insecure-Requests': '1'
-      },
-      credentials: 'omit' // 不发送 cookies
+      }
     })
     
-    if (!res.ok) {
-      throw new Error(`HTTP error! status: ${res.status}`)
+    console.log(`Successfully fetched HTML. Length: ${html.length}`)
+    
+    // 检查是否有反爬相关内容
+    if (html.includes('访问受限') || html.includes('请求频率过高') || html.includes('验证码')) {
+      console.error('可能遇到反爬机制，页面包含访问限制信息')
+      throw new Error('页面可能被反爬拦截')
     }
     
-    const html = await res.text()
-    console.log(`Successfully fetched HTML. Length: ${html.length}`)
     const $ = load(html)
+    
+    // 检查页面结构
+    const hasPostList = $('#post_list').length > 0
+    console.log(`Post list container found: ${hasPostList}`)
+    
+    // 查找所有文章元素
+    const articleElements = $("#post_list article.post-item")
+    console.log(`Found ${articleElements.length} article elements`)
+    
+    if (articleElements.length === 0) {
+      // 如果找不到文章，尝试调试页面结构
+      console.log('Debug page structure:', {
+        'Title': $('title').text(),
+        'Body classes': $('body').attr('class'),
+        'Main content elements': $('main').length,
+        'Article elements anywhere': $('article').length
+      })
+      
+      // 尝试其他可能的选择器
+      const alternativeArticles = $(".post-list article, article.post-item")
+      console.log(`Found ${alternativeArticles.length} articles with alternative selector`)
+      
+      if (alternativeArticles.length > 0) {
+        console.log('Using alternative selector for articles')
+        articleElements = alternativeArticles
+      }
+    }
   
-    // 更新选择器以只匹配div#post_list.post-list容器内的article.post-item
-    const items: NewsItem[] = $("#post_list article.post-item").map((_, el) => {
+    // 提取文章信息
+    const items: NewsItem[] = articleElements.map((_, el) => {
       const $el = $(el)
       const title = $el.find("a.post-item-title").text().trim()
       const url = $el.find("a.post-item-title").attr("href") || ""
@@ -71,9 +124,7 @@ const cnblogs = defineSource(async () => {
     }).get()
 
     if (items.length === 0) {
-      console.warn('No items found on cnblogs page. Checking HTML structure...')
-      console.log('Post list container exists:', $('#post_list').length > 0)
-      console.log('Articles within post_list count:', $('#post_list article.post-item').length)
+      console.error('No items found on cnblogs page')
       throw new Error('No items found on cnblogs page')
     }
     
@@ -85,7 +136,10 @@ const cnblogs = defineSource(async () => {
       console.error(`Response status: ${error.response.status}`)
       console.error(`Response headers:`, error.response.headers)
     }
-    throw error
+    
+    // 返回空数组而不是抛出异常，避免整个应用崩溃
+    console.log('Returning empty array due to error')
+    return []
   }
 })
 
