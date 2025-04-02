@@ -309,7 +309,7 @@ export const originSources = {
     name: "博客园",
     color: "green",
     column: "tech",
-    home: "https://www.cnblogs.com/",
+    home: "https://www.cnblogs.com",
     interval: Time.Common,
   },
 } as const satisfies Record<string, OriginSource>
