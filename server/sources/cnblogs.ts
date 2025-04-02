@@ -32,8 +32,8 @@ const cnblogs = defineSource(async () => {
     const url = "https://www.cnblogs.com/sitehome/p/1"
     console.log(`Fetching ${url}...`)
 
-    // 尝试直接获取HTML，绕过可能的中间件处理
-    console.log('Trying direct fetch to avoid API redirection...')
+    // 直接获取HTML
+    console.log('Using direct fetch to avoid API redirection...')
     const html = await directFetchHtml(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -59,7 +59,7 @@ const cnblogs = defineSource(async () => {
     const hasPostList = $('#post_list').length > 0
     console.log(`Post list container found: ${hasPostList}`)
     
-    // 查找所有文章元素
+    // 查找所有文章元素，确保获取所有文章
     const articleElements = $("#post_list article.post-item")
     console.log(`Found ${articleElements.length} article elements`)
     
@@ -68,22 +68,14 @@ const cnblogs = defineSource(async () => {
       console.log('Debug page structure:', {
         'Title': $('title').text(),
         'Body classes': $('body').attr('class'),
-        'Main content elements': $('main').length,
-        'Article elements anywhere': $('article').length
+        'Main content elements': $('main').length
       })
       
-      // 尝试其他可能的选择器
-      const alternativeArticles = $(".post-list article, article.post-item")
-      console.log(`Found ${alternativeArticles.length} articles with alternative selector`)
-      
-      if (alternativeArticles.length > 0) {
-        console.log('Using alternative selector for articles')
-        articleElements = alternativeArticles
-      }
+      throw new Error('No article elements found in page')
     }
   
-    // 提取文章信息
-    const items: NewsItem[] = articleElements.map((_, el) => {
+    // 提取文章信息 - 使用Array.from确保可以正确处理所有文章
+    const items: NewsItem[] = Array.from(articleElements).map((el) => {
       const $el = $(el)
       const title = $el.find("a.post-item-title").text().trim()
       const url = $el.find("a.post-item-title").attr("href") || ""
@@ -121,11 +113,11 @@ const cnblogs = defineSource(async () => {
           hover: summary,
         },
       }
-    }).get()
+    })
 
     if (items.length === 0) {
-      console.error('No items found on cnblogs page')
-      throw new Error('No items found on cnblogs page')
+      console.error('成功找到文章元素，但无法提取内容')
+      throw new Error('No items could be extracted')
     }
     
     console.log(`Successfully extracted ${items.length} items from cnblogs`)
