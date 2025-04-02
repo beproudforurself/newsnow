@@ -1,8 +1,11 @@
 import type { NewsItem } from "@shared/types"
 import { load } from "cheerio"
 
+// 添加延迟函数
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 // 使用直接获取HTML的方法，绕过可能的API重定向
-const directFetchHtml = async (url: string, options = {}) => {
+const directFetchHtml = async (url: string, options = {}, waitTime = 0) => {
   try {
     // 使用fetch API直接请求，避免可能的中间件处理
     const response = await fetch(url, {
@@ -14,7 +17,15 @@ const directFetchHtml = async (url: string, options = {}) => {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
     
-    return await response.text();
+    const html = await response.text();
+    
+    // 添加延迟，等待页面完全加载
+    if (waitTime > 0) {
+      console.log(`Waiting ${waitTime}ms for page to fully load...`);
+      await delay(waitTime);
+    }
+    
+    return html;
   } catch (error) {
     console.error(`Error directly fetching ${url}:`, error);
     throw error;
@@ -39,7 +50,7 @@ const quick = defineSource(async () => {
         'Pragma': 'no-cache',
         'Referer': 'https://www.36kr.com/',
       }
-    })
+    }, 5000) // 等待5秒，确保页面完全加载
     
     console.log(`Successfully fetched HTML. Length: ${html.length}`)
     
