@@ -84,7 +84,7 @@ export const originSources = {
     type: "realtime",
     color: "blue",
     // cloudflare pages cannot access
-    disable: "cf",
+    //disable: "cf",
     home: "https://36kr.com",
     column: "tech",
     sub: {
