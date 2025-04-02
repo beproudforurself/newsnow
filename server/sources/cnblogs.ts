@@ -29,8 +29,8 @@ const cnblogs = defineSource(async () => {
     console.log(`Successfully fetched HTML. Length: ${html.length}`)
     const $ = load(html)
   
-    // 更新选择器以匹配实际的页面结构
-    const items: NewsItem[] = $("article.post-item").map((_, el) => {
+    // 更新选择器以只匹配div#post_list.post-list容器内的article.post-item
+    const items: NewsItem[] = $("#post_list article.post-item").map((_, el) => {
       const $el = $(el)
       const title = $el.find("a.post-item-title").text().trim()
       const url = $el.find("a.post-item-title").attr("href") || ""
@@ -41,26 +41,39 @@ const cnblogs = defineSource(async () => {
         .find("a").remove().end()
         .text().trim()
       
-      // 提取发布时间
+      // 提取发布时间 
       const time = $el.find("footer .post-meta-item > span").first().text().trim()
       
       // 提取阅读量
-      const viewsText = $el.find("a.post-meta-item[title^='阅读']").text().trim()
+      const viewsElem = $el.find("a.post-meta-item[title^='阅读']")
+      const viewsText = viewsElem.text().trim()
       const views = viewsText.match(/\d+/) ? viewsText.match(/\d+/)[0] : ''
+      
+      // 提取评论数
+      const commentElem = $el.find("a.post-meta-item[title^='评论']")
+      const commentText = commentElem.text().trim()
+      const comments = commentText.match(/\d+/) ? commentText.match(/\d+/)[0] : '0'
+      
+      // 提取推荐数
+      const likeElem = $el.find("a.post-meta-item[title^='推荐']")
+      const likeText = likeElem.text().trim()
+      const likes = likeText.match(/\d+/) ? likeText.match(/\d+/)[0] : '0'
       
       return {
         id: url,
         title,
         url,
         extra: {
-          info: `${author} · ${time} · 阅读 ${views}`,
+          info: `${author} · ${time} · 阅读 ${views} · 评论 ${comments} · 推荐 ${likes}`,
           hover: summary,
         },
       }
     }).get()
 
     if (items.length === 0) {
-      console.warn('No items found on cnblogs page. HTML content:', html.substring(0, 500))
+      console.warn('No items found on cnblogs page. Checking HTML structure...')
+      console.log('Post list container exists:', $('#post_list').length > 0)
+      console.log('Articles within post_list count:', $('#post_list article.post-item').length)
       throw new Error('No items found on cnblogs page')
     }
     
